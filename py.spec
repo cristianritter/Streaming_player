@@ -3,7 +3,7 @@
 block_cipher = None
 
 
-a = Analysis(['streaming_player.py'],
+a = Analysis(['py', 'streaming_player.py'],
              pathex=['C:\\Users\\cristian_ritter\\Documents\\PROJETOS\\Streaming_player'],
              binaries=[],
              datas=[],
@@ -21,12 +21,12 @@ exe = EXE(pyz,
           a.scripts,
           [],
           exclude_binaries=True,
-          name='streaming_player',
+          name='py',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
           upx=True,
-          console=True )
+          console=True , version='player_version.vfl')
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,
@@ -34,4 +34,4 @@ coll = COLLECT(exe,
                strip=False,
                upx=True,
                upx_exclude=[],
-               name='streaming_player')
+               name='py')
