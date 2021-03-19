@@ -2,76 +2,86 @@ import vlc
 import time
 import parse_config
 from threading import Thread
-from datetime import date, datetime, timedelta
+from datetime import datetime
+import pyaudio
+import struct
+import math
 
-restart = False
-
-@vlc.CallbackDecorators.LogCb
-def log_callback(data, level, ctx, fmt, args):
-    dataFormatada = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-    # Do something interesting
-    print(dataFormatada + "FMT: " + fmt.decode())
-    if "HTTP" in fmt.decode() or 'pts_delay' in fmt.decode() or 'deactivating' in fmt.decode():
-        global restart
-        print("Falha detectada...\n\n\n")
-        restart = True
-        time.sleep(5)
-
-def nova_instancia(radio_name, audio_link, output_dev):
-    good_states = ["State.Playing", "State.NothingSpecial", "State.Opening"]
-    i = vlc.Instance('--verbose 1')
-    i.log_set(log_callback, None)
-    player = i.media_player_new()
-    media = i.media_new(audio_link)
-    media.get_mrl()
-    player.audio_output_set('waveout')
-    player.audio_output_device_set('waveout', output_dev)
-    player.stop()
-    player.set_media(media)
-    time.sleep(0.5)
-    player.play()
-    time.sleep(1)
-    while 1:
-        global restart
-        status = player.get_state()
-        if not str(status) in good_states:
-            print("ERRO DETECTADO: ", status)
-            restart = True 
-        if not restart:
-            time.sleep(5)
-            #print('{} - Stream is working. Current state = {}'.format(radio_name, player.get_state()))
-        else:
-            restart = False 
-            print('Stream is not working. Current state = {}'.format(player.get_state()))
-            print('Tentando reiniciar o serviço...')
-            time.sleep(1)
-            player.stop()
-            time.sleep(1)
-            i = vlc.Instance('--verbose 1')
-            i.log_set(log_callback, None)
-            player = i.media_player_new()
-            media = i.media_new(audio_link)
-            media.get_mrl()
-            time.sleep(1)
-            player.audio_output_set('waveout')
-            time.sleep(1)
-            player.audio_output_device_set('waveout', output_dev)
-            time.sleep(1)
-            player.set_media(media)
-            time.sleep(1)
-            player.play()
-            time.sleep(10)
-      
 configuration = parse_config.ConfPacket()
 streamings = configuration.load_config('DEFAULT')
-t = []
 
+class Streaming:
+    def __init__(self, radio_name, audio_link, output_dev, name, device_index):
+        self.radio_name = radio_name
+        self.audio_link = audio_link
+        self.output_dev = output_dev
+        self.name = name
+        self.index = device_index
+        self.i = None
+        self.player = None
+        while 1:       
+            print('Iniciando player...')
+            self.listen()
+        
+    def get_rms(self, block ):
+        count = len(block)/2
+        format = "%dh"%(count)
+        shorts = struct.unpack( format, block )
+        sum_squares = 0.0
+        for sample in shorts:
+            n = sample * (1.0/32768.0)
+            sum_squares += n*n
+        return math.sqrt( sum_squares / count )
+ 
+    def iniciar_streaming(self):
+        self.i = vlc.Instance('--verbose -1')
+        self.player = self.i.media_player_new()
+        media = self.i.media_new(self.audio_link)
+        media.get_mrl()
+        self.player.audio_output_set('waveout')
+        self.player.audio_output_device_set('waveout', self.output_dev)
+        self.player.audio_output_set('waveout')
+        self.player.audio_output_device_set('waveout', self.output_dev)
+        self.player.set_media(media)
+        self.player.play()
+
+    def open_mic_stream(self):
+        pa = pyaudio.PyAudio()
+        self.INPUT_FRAMES_PER_BLOCK = int(44100*5)
+        stream = pa.open(   format = pyaudio.paInt16 ,
+                                    channels = 2,
+                                    rate = 44100,
+                                    input = True,
+                                    input_device_index = self.index,
+                                    frames_per_buffer = self.INPUT_FRAMES_PER_BLOCK)
+        return stream
+    
+    def listen(self):
+        try:
+            self.iniciar_streaming()
+            amplitude = 1
+            while amplitude > 0.001:
+                stream = self.open_mic_stream()
+                block = stream.read(self.INPUT_FRAMES_PER_BLOCK)
+                amplitude = self.get_rms( block )
+                print('Audio level '+self.name+': ', amplitude)
+                time.sleep(0.1)
+            self.player.stop()
+        except IOError:
+            pass
+
+def nova_target(radio_name, audio_link, output_dev, streamings, rec_idx):
+    Streaming(radio_name, audio_link, output_dev, streamings, rec_idx)
+
+t=[]
 for idx, item in enumerate(streamings['DEFAULT']):
     configs = configuration.load_config(streamings['DEFAULT'][item])
     radio_name = configs[streamings['DEFAULT'][item]]['radio_name']
     audio_link = configs[streamings['DEFAULT'][item]]['audio_link']
     output_dev = configs[streamings['DEFAULT'][item]]['output_dev']
-    t.append( Thread(target=nova_instancia, args=[radio_name,audio_link,output_dev]) ) 
+    rec_dev_index = int(configs[streamings['DEFAULT'][item]]['rec_dev_index'])
+    print(radio_name)
+    t.append (Thread(target=nova_target, args=(radio_name, audio_link, output_dev, streamings['DEFAULT'][item], rec_dev_index)))
     t[idx].start()
     time.sleep(1)
-
+   

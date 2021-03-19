@@ -26,7 +26,7 @@ exe = EXE(pyz,
           bootloader_ignore_signals=False,
           strip=False,
           upx=True,
-          console=True , icon='str.ico')
+          console=True , version='player_version.vfl', icon='str.ico')
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,
