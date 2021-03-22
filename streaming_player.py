@@ -1,14 +1,24 @@
 import vlc
-import time
+from time import sleep
 import parse_config
 from threading import Thread
 from datetime import datetime
 import pyaudio
-import struct
-import math
+from struct import unpack
+from math import sqrt
+import os
 
 configuration = parse_config.ConfPacket()
 streamings = configuration.load_config('DEFAULT')
+
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__)) # This is your Project Root
+
+print("Carregando DLLS...")
+try:
+    VLC_DIR = os.path.join(ROOT_DIR, 'VLC\\')        
+    os.add_dll_directory(r'{}'.format(VLC_DIR))
+except Exception as Err:
+    pass
 
 class Streaming:
     def __init__(self, radio_name, audio_link, output_dev, name, device_index):
@@ -26,12 +36,12 @@ class Streaming:
     def get_rms(self, block ):
         count = len(block)/2
         format = "%dh"%(count)
-        shorts = struct.unpack( format, block )
+        shorts = unpack( format, block )
         sum_squares = 0.0
         for sample in shorts:
             n = sample * (1.0/32768.0)
             sum_squares += n*n
-        return math.sqrt( sum_squares / count )
+        return sqrt( sum_squares / count )
  
     def iniciar_streaming(self):
         self.i = vlc.Instance('--verbose -1')
@@ -65,8 +75,10 @@ class Streaming:
                 block = stream.read(self.INPUT_FRAMES_PER_BLOCK)
                 amplitude = self.get_rms( block )
                 print('Audio level '+self.name+': ', amplitude)
-                time.sleep(0.1)
+                sleep(0.1)
             self.player.stop()
+            sleep(1)
+            print('finalizado')
         except IOError:
             pass
 
@@ -82,6 +94,7 @@ for idx, item in enumerate(streamings['DEFAULT']):
     rec_dev_index = int(configs[streamings['DEFAULT'][item]]['rec_dev_index'])
     print(radio_name)
     t.append (Thread(target=nova_target, args=(radio_name, audio_link, output_dev, streamings['DEFAULT'][item], rec_dev_index)))
+    print('startando threading')
     t[idx].start()
-    time.sleep(1)
+    sleep(1)
    
