@@ -83,6 +83,7 @@ class Streaming:
             pass
 
 def nova_target(radio_name, audio_link, output_dev, streamings, rec_idx):
+    print('Starting threading: ', radio_name, audio_link, output_dev, streamings, rec_idx)
     Streaming(radio_name, audio_link, output_dev, streamings, rec_idx)
 
 t=[]
@@ -94,7 +95,6 @@ for idx, item in enumerate(streamings['DEFAULT']):
     rec_dev_index = int(configs[streamings['DEFAULT'][item]]['rec_dev_index'])
     print(radio_name)
     t.append (Thread(target=nova_target, args=(radio_name, audio_link, output_dev, streamings['DEFAULT'][item], rec_dev_index)))
-    print('startando threading')
     t[idx].start()
-    sleep(1)
+    sleep(3)
    
