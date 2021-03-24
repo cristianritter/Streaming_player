@@ -21,12 +21,11 @@ except Exception as Err:
     pass
 
 class Streaming:
-    def __init__(self, radio_name, audio_link, output_dev, name, device_index):
+    def __init__(self, radio_name, audio_link, output_dev, name):
         self.radio_name = radio_name
         self.audio_link = audio_link
         self.output_dev = output_dev
         self.name = name
-        self.index = device_index
         self.i = None
         self.player = None
         while 1:       
@@ -57,12 +56,19 @@ class Streaming:
 
     def open_mic_stream(self):
         pa = pyaudio.PyAudio()
+        for numero in range(0, 10):
+            index=numero
+            nome = pa.get_device_info_by_index(numero)["name"]
+            primeiro_nome = nome[0:nome.find(' ')]
+            if primeiro_nome in self.output_dev:
+                break
+        
         self.INPUT_FRAMES_PER_BLOCK = int(44100*5)
         stream = pa.open(   format = pyaudio.paInt16 ,
                                     channels = 2,
                                     rate = 44100,
                                     input = True,
-                                    input_device_index = self.index,
+                                    input_device_index = index,
                                     frames_per_buffer = self.INPUT_FRAMES_PER_BLOCK)
         return stream
     
@@ -74,17 +80,17 @@ class Streaming:
                 stream = self.open_mic_stream()
                 block = stream.read(self.INPUT_FRAMES_PER_BLOCK)
                 amplitude = self.get_rms( block )
-                print('Audio level '+self.name+': ', amplitude)
+                #print('Audio level '+self.name+': ', amplitude)
                 sleep(0.1)
             self.player.stop()
             sleep(1)
-            print('finalizado')
+            #print('finalizado')
         except IOError:
             pass
 
-def nova_target(radio_name, audio_link, output_dev, streamings, rec_idx):
-    print('Starting threading: ', radio_name, audio_link, output_dev, streamings, rec_idx)
-    Streaming(radio_name, audio_link, output_dev, streamings, rec_idx)
+def nova_target(radio_name, audio_link, output_dev, streamings):
+    print('Starting threading: ', radio_name, audio_link, output_dev, streamings)
+    Streaming(radio_name, audio_link, output_dev, streamings)
 
 t=[]
 for idx, item in enumerate(streamings['DEFAULT']):
@@ -92,9 +98,8 @@ for idx, item in enumerate(streamings['DEFAULT']):
     radio_name = configs[streamings['DEFAULT'][item]]['radio_name']
     audio_link = configs[streamings['DEFAULT'][item]]['audio_link']
     output_dev = configs[streamings['DEFAULT'][item]]['output_dev']
-    rec_dev_index = int(configs[streamings['DEFAULT'][item]]['rec_dev_index'])
     print(radio_name)
-    t.append (Thread(target=nova_target, args=(radio_name, audio_link, output_dev, streamings['DEFAULT'][item], rec_dev_index)))
+    t.append (Thread(target=nova_target, args=(radio_name, audio_link, output_dev, streamings['DEFAULT'][item])))
     t[idx].start()
     sleep(3)
    
